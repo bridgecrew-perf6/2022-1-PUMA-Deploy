@@ -1,0 +1,98 @@
+version: "3"
+services:
+    db:
+        image: postgres
+        environment:
+            POSTGRES_PASSWORD: ${DB_PASS}
+            POSTGRES_USER: ${DB_USER}
+            POSTGRES_DB: ${DB}
+            DATABASE_URL: ${DB_URL}
+        volumes:
+            - ./dbdata:/var/lib/postgresql/data
+        ports:
+            - "5432:5432"
+        networks:
+            - puma-network-p
+    project-service:
+        container_name: project-service
+        image: ${DOCKER_HUB}/projectservice
+        labels:
+            - "com.centurylinklabs.watchtower.enable=true"
+        restart: always
+        environment:
+            ENVIRONMENT: ${ENVIRONMENT}
+            IP_ADDRESS: ${IP_ADDRESS}
+            SECRET_PROD: ${SECRET_PROD}
+            DB_URL: ${DB_URL}
+        ports:
+            - "3000:3000"
+        depends_on:
+            - db
+        networks:
+            - puma-network-p
+        command:
+          ["./wait-for-it.sh", "db:5432", "--", "npm","run","start"]
+    user-service:
+        container_name: user-service
+        image: ${DOCKER_HUB}/userservice
+        labels:
+            - "com.centurylinklabs.watchtower.enable=true"
+        restart: always
+        environment:
+            ENVIRONMENT: ${ENVIRONMENT}
+            IP_ADDRESS: ${IP_ADDRESS}
+            SECRET_PROD: ${SECRET_PROD}
+            DB_URL: ${DB_URL}
+            EMAIL_USER: ${EMAIL_USER}
+            EMAIL_PASS: ${EMAIL_PASS}
+            EMAIL_HOST: ${EMAIL_HOST}
+            EMAIL_PORT: ${EMAIL_PORT}
+            EMAIL_SERVICE: ${EMAIL_SERVICE}
+            RECOVER_PAGE: ${RECOVER_PAGE}
+        ports:
+            - "3001:3001"
+        depends_on:
+            - db
+        networks:
+            - puma-network-p
+        command:
+          ["./wait-for-it.sh", "db:5432", "--", "npm","run","start"]
+    api-gateway:
+        container_name: api-gateway
+        image: ${DOCKER_HUB}/apigateway
+        labels:
+            - "com.centurylinklabs.watchtower.enable=true"
+        restart: always
+        environment:
+            ENVIRONMENT: ${ENVIRONMENT}
+            IP_ADDRESS: ${IP_ADDRESS}
+            SECRET_PROD: ${SECRET_PROD}
+            DB_URL: ${DB_URL}
+        ports:
+            - "3004:3004"
+        networks:
+            - puma-network-p
+    frontend:
+        container_name: frontend
+        image: ${DOCKER_HUB}/frontend
+        labels:
+            - "com.centurylinklabs.watchtower.enable=true"
+        environment:
+            VUE_APP_ENVIRONMENT: ${ENVIRONMENT}
+            VUE_APP_IP_ADDRESS: ${IP_ADDRESS}
+        ports:
+            - "80:80"
+        networks:
+            - puma-network-p
+    watchtower:
+        image: containrrr/watchtower
+        volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+        command: --interval 30
+        labels:
+        - "com.centurylinklabs.watchtower.enable=false"
+
+            
+networks:
+    puma-network-p:            
+        driver: bridge
